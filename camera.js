@@ -44,7 +44,7 @@ const ExampleCamera = (function () {
     let response = {}
     let sessionInfo = {}
 
-    const sessionID = request.sessionID
+    const sessionId = request.sessionID
 
     const video = request.video
     const audio = request.audio
@@ -115,20 +115,20 @@ const ExampleCamera = (function () {
 
     // sessionInfo["address"] = request["targetAddress"]
 
-    // const sessionID = request["sessionID"]
-    // const sessionIdentifier = uuid.unparse(sessionID)
-    this.pendingSessions[sessionID] = sessionInfo
+    // const sessionId = request["sessionId"]
+    // const sessionIdentifier = uuid.unparse(sessionId)
+    this.pendingSessions[sessionId] = sessionInfo
 
     callback(null, response)
   }
   
   // called when iOS device asks stream to start/stop/reconfigure
   ExampleCamera.prototype.handleStreamRequest = function(request, callback) {
-    const sessionID = request.sessionID
+    const sessionId = request.sessionID
   
     switch (request.type) {
     case StreamRequestTypes.START:
-      const sessionInfo = this.pendingSessions[sessionID]
+      const sessionInfo = this.pendingSessions[sessionId]
     
       if (sessionInfo) {
         let width = 1024
@@ -183,40 +183,45 @@ const ExampleCamera = (function () {
           console.log(code, signal)
           
           if (this.running) {
-            this.controller.forceStopStreamingSession(sessionID)
+            this.controller.forceStopStreamingSession(sessionId)
           }
         })
         
-        process.on('uncaughtException', (e) => {
-          console.log(e)
+        process.on('uncaughtException', (err) => {
+          console.log(err)
         })
         
         callback() // do not forget to execute callback once set up
 
-        this.ongoingSessions[sessionID] = process
+        this.ongoingSessions[sessionId] = process
+        delete this.pendingSessions[sessionId]
       }
-        
-      delete this.pendingSessions[sessionID]
       break
     
     case StreamRequestTypes.RECONFIGURE:
+      // not supported by this example
+      console.log("Received (unsupported) request to reconfigure to: " + JSON.stringify(request.video))
       callback()
       break
       
     case StreamRequestTypes.STOP:
-      const ongoingSession = this.ongoingSessions[sessionID]
+      const ongoingSession = this.ongoingSessions[sessionId]
+      if (!ongoingSession) {
+        callback()
+        break
+      }
 
       try {
-        if (ongoingSession) {
-          ongoingSession.kill('SIGKILL')
-        }
-      
+        ongoingSession.kill("SIGKILL")
+        
       } catch (e) {
+        console.log("Error occurred terminating the video process!")
         console.log(e)
       }
 
-      delete this.ongoingSessions[sessionID]
-      
+      delete this.ongoingSessions[sessionId]
+
+      console.log("Stopped streaming session!")
       callback()
       break
     }
